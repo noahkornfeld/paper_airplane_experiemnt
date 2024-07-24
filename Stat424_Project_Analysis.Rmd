@@ -1,0 +1,266 @@
+---
+title: "Stat424 Project Analysis"
+output: html_document
+date: "2024-04-18"
+author: "Noah Kornfeld"
+---
+
+```{r}
+library(tidyverse)
+library(faraway)
+```
+
+Creating Results Data Frame
+```{r}
+# Airplane Design: Classic Dart (+) vs Racer (-)
+# Paper Type: Blank Printer (+) vs Lined (-)
+# Paper Size: 8.5x11 (+) vs 11x17 (-)
+sd_measures = c(sd(c(123, 90.5, 185)), sd(c(252, 293, 213)),
+                sd(c(198, 161, 255)), sd(c(288, 397.5, 267.5)), 
+                sd(c(109, 56.5, 54)), sd(c(76, 90.5, 60)), 
+                sd(c(142, 216, 190.5)), sd(c(177.5, 157, 124)))
+
+results = tibble(
+  trial = seq(1,8),
+  airplane_design_A = c(1, 1, 1, 1, -1, -1, -1, -1),
+  paper_type_B = c(-1, -1, 1, 1, -1, -1, 1, 1),
+  paper_size_C = c(1, -1, 1, -1, 1, -1, 1, -1),
+  AxB = airplane_design_A * paper_type_B,
+  AxC = airplane_design_A * paper_size_C,
+  BxC = paper_type_B * paper_size_C,
+  AxBxC = airplane_design_A * paper_type_B * paper_size_C,
+  run_1 = c(123, 252, 198, 288, 109, 76, 142, 177.5),
+  run_2 = c(90.5, 293, 161, 397.5, 56.5, 90.5, 216, 157),
+  run_3 = c(185, 213, 255, 267.5, 54, 60, 190.5, 124)
+) %>% 
+ mutate(mean = (run_1 + run_2 + run_3)/3, 
+        variance = (sd_measures)^2,
+        lns2 = log(variance))
+
+results
+```
+Descriptive Analysis:
+> Run 4 had the highest mean but also the highest variance. Run 2 and 3 also had high means but with much lower variances. Run 5 and 6 had the lowest means and also the lowest variances
+
+Estimating Main Effects and Interactions 
+```{r}
+model_df <- results[, c(2:8, 12)]
+model_df
+effects_model <- lm(mean ~ -1 + ., data = model_df)
+summary(effects_model)
+```
+
+```{r}
+dispersion_df <- results[, c(2:8, 13)]
+dispersion_df
+dispersion_model <- lm(variance ~ -1 + ., data = dispersion_df)
+summary(dispersion_model)
+```
+
+
+
+Code to Create Interaction plots
+
+Getting Responses: 
+
+AxB
+```{r}
+A_pos_B_pos = model_df %>% 
+  filter(airplane_design_A == 1 & paper_type_B == 1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+A_pos_B_neg = model_df %>% 
+  filter(airplane_design_A == 1 & paper_type_B == -1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+A_neg_B_pos = model_df %>% 
+  filter(airplane_design_A == -1 & paper_type_B == 1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+A_neg_B_neg = model_df %>% 
+  filter(airplane_design_A == -1 & paper_type_B == -1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+```
+
+AxC
+```{r}
+A_pos_C_pos = model_df %>% 
+  filter(airplane_design_A == 1 & paper_size_C == 1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+A_pos_C_neg = model_df %>% 
+  filter(airplane_design_A == 1 & paper_size_C == -1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+A_neg_C_pos = model_df %>% 
+  filter(airplane_design_A == -1 & paper_size_C == 1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+A_neg_C_neg = model_df %>% 
+  filter(airplane_design_A == -1 & paper_size_C == -1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+```
+
+BxC
+```{r}
+B_pos_C_pos = model_df %>% 
+  filter(paper_type_B == 1 & paper_size_C == 1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+B_pos_C_neg = model_df %>% 
+  filter(paper_type_B == 1 & paper_size_C == -1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+B_neg_C_pos = model_df %>% 
+  filter(paper_type_B == -1 & paper_size_C == 1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+
+B_neg_C_neg = model_df %>% 
+  filter(paper_type_B == -1 & paper_size_C == -1) %>% 
+  summarize(response = mean(mean)) %>% 
+  pull(response)
+```
+
+Creating Graphs:
+
+AxB
+```{r}
+plot_data_A_B <- data.frame(
+  A_Level = factor(rep(c("A: -", "A: +"), each = 2)),
+  B_Level = rep(c("B: -", "B: +"), times = 2),
+  Response = c(A_neg_B_neg, A_neg_B_pos, A_pos_B_neg, A_pos_B_pos)
+)
+
+ggplot(plot_data_A_B, aes(x = A_Level, y = Response, group = B_Level, color = B_Level)) +
+  geom_line() +
+  geom_point(size = 3) +
+  labs(x = "Airplane Design (A)", y = "Distance Traveled (in)", color = "Paper Type (B)") +
+  theme_minimal() +
+  theme(text=element_text(size=15))
+
+ggplot(plot_data_A_B, aes(x = B_Level, y = Response, group = A_Level, color = A_Level)) +
+  geom_line() +
+  geom_point(size = 3) +
+  labs(x = "Paper Type (B)", y = "Distance Traveled (in)", color = "Airplane Design (A)") +
+  theme_minimal() +
+  theme(text=element_text(size=15))
+
+
+```
+
+AxC
+```{r}
+plot_data_A_C <- data.frame(
+  A_Level = factor(rep(c("A: -", "A: +"), each = 2)),
+  C_Level = rep(c("C: -", "C: +"), times = 2),
+  Response = c(A_neg_C_neg, A_neg_C_pos, A_pos_C_neg, A_pos_C_pos)
+)
+
+ggplot(plot_data_A_C, aes(x = A_Level, y = Response, group = C_Level, color = C_Level)) +
+  geom_line() +
+  geom_point(size = 3) +
+  labs(x = "Airplane Design (A)", y = "Distance Traveled (in)", color = "Paper Size (C)") +
+  theme_minimal() +
+  theme(text=element_text(size=15))
+
+
+ggplot(plot_data_A_C, aes(x = C_Level, y = Response, group = A_Level, color = A_Level)) +
+  geom_line() +
+  geom_point(size = 3) +
+  labs(x = "Paper Size (C)", y = "Distance Traveled (in)", color = "Airplane Design (A)") +
+  theme_minimal() +
+  theme(text=element_text(size=15))
+
+```
+
+BxC
+```{r}
+plot_data_B_C <- data.frame(
+  B_Level = factor(rep(c("B: -", "B: +"), each = 2)),
+  C_Level = rep(c("C: -", "C: +"), times = 2),
+  Response = c(B_neg_C_neg, B_neg_C_pos, B_pos_C_neg, B_pos_C_pos)
+)
+
+ggplot(plot_data_B_C, aes(x = B_Level, y = Response, group = C_Level, color = C_Level)) +
+  geom_line() +
+  geom_point(size = 3) +
+  labs(x = "Paper Type (B)", y = "Distance Traveled (in)", color = "Paper Size (C)") +
+  theme_minimal() +
+  theme(text=element_text(size=15))
+
+
+ggplot(plot_data_B_C, aes(x = C_Level, y = Response, group = B_Level, color = B_Level)) +
+  geom_line() +
+  geom_point(size = 3) +
+  labs(x = "Paper Size (C)", y = "Distance Traveled (in)", color = "Paper Type (B)") +
+  theme_minimal() +
+  theme(text=element_text(size=15))
+
+```
+
+
+
+Testing Effect Significance 
+```{r}
+summary(effects_model)$coefficients
+```
+
+Computing Effects/Interactions
+```{r}
+beta.hats <- summary(effects_model)$coefficients[, 1] * 2
+effects = tibble(
+  effect = c("A", "B", "C", "AxB", "AxC", "BxC", "AxBxC"),
+  value = beta.hats[1:7]
+)
+effects
+
+```
+
+Lenth's Method for Means
+```{r}
+s.0 = 1.5 * median(abs(beta.hats))
+
+
+PSE = 1.5 * median(abs(beta.hats[abs(beta.hats) < 2.5 * s.0]))
+
+
+t.pse = beta.hats / PSE
+
+critical_value_0.05 = 2.3 # IER at alpha = 0.05 and I = 7
+critical_value_0.2 = 1.2 # IER at alpha = 0.2 and I = 7
+
+effect_significance_0.05 <- data.frame(y.bar = abs(t.pse), reject = abs(t.pse) > critical_value_0.05)
+effect_significance_0.2 <- data.frame(y.bar = abs(t.pse), reject = abs(t.pse) > critical_value_0.2)
+```
+
+Significant at 0.05 
+```{r}
+effect_significance_0.05
+```
+
+Significant at 0.2 --> Lowest p where atleast one estimate is significant
+```{r}
+effect_significance_0.2
+```
+
+
+Half-Normal Plot for Effects
+```{r}
+beta.hats_plotting <- beta.hats[!is.na(beta.hats)]
+sorted_beta.hats <- sort(abs(beta.hats_plotting), decreasing = TRUE)
+names <- names(sorted_beta.hats)
+
+halfnorm(abs(sorted_beta.hats), labs = c("A", "B", "AC", "C", "AB", "BC", "ABC"), nlab = 7, ylab = "Location")
+```
+> Can see from the plot that the effect labeled 'A' is the most significant as it varies farthest from the other points. This result is consistent with our results from using Lenth's method. 
